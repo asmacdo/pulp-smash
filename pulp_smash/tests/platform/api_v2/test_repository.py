@@ -1,6 +1,7 @@
 # coding=utf-8
 """Test the `repository`_ API endpoints.
 
+<<<<<<< HEAD
 The assumptions explored in this module have the following dependencies::
 
         It is possible to create a repository.
@@ -10,6 +11,8 @@ The assumptions explored in this module have the following dependencies::
         ├── It is possible to update a repository.
         └── It is possible to delete a repository.
 
+=======
+>>>>>>> Add basic tests for repository CRUD.
 .. _repository:
     https://pulp.readthedocs.org/en/latest/dev-guide/integration/rest-api/repo/index.html
 
