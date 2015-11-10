@@ -46,6 +46,7 @@ from __future__ import unicode_literals
 
 import requests
 
+from pulp_smash.compat import urlencode
 from pulp_smash.config import get_config
 from pulp_smash.constants import REPOSITORY_PATH, ERROR_KEYS
 from pulp_smash.utils import rand_str
@@ -71,6 +72,21 @@ SERIALIZED_ISO_DISTRIBUTOR = {
     'distributor_type_id': 'iso_distributor',
     'last_publish': None,
 }
+
+
+class BaseTest(TestCase):
+
+    @classmethod
+    def get(cls, path, query=None):
+        """Build a url and make a get request."""
+        # TODO asmacdo dict + list?
+        if isinstance(query, dict):
+            query = urlencode(query)
+        if query is not None:
+            full_url = "{base}{path}?{query}".format(base=cls.cfg.base_url, path=path, query=query)
+        else:
+            full_url = "{base}{path}".format(base=cls.cfg.base_url, path=path)
+        return requests.get(full_url, **cls.cfg.get_requests_kwargs())
 
 
 class CreateSuccessTestCase(TestCase):
@@ -169,42 +185,41 @@ class CreateFailureTestCase(TestCase):
             for body in cls.bodies
         ))
 
-    # TODO asmacdo uncomment
-    # def test_status_code(self):
-    #     """Assert that each response has the expected HTTP status code."""
-    #     for i, response in enumerate(self.responses):
-    #         with self.subTest(self.bodies[i]):
-    #             self.assertEqual(response.status_code, self.bodies[i][0])
+    def test_status_code(self):
+        """Assert that each response has the expected HTTP status code."""
+        for i, response in enumerate(self.responses):
+            with self.subTest(self.bodies[i]):
+                self.assertEqual(response.status_code, self.bodies[i][0])
 
-#     def test_location_header(self):
-#         """Assert that the Location header is correctly set in the response."""
-#         for i, response in enumerate(self.responses):
-#             with self.subTest(self.bodies[i]):
-#                 if self.bodies[i][0] == 201:
-#                     self.assertEqual(
-#                         self.url + self.bodies[i][1]['id'] + '/',
-#                         response.headers['Location']
-#                     )
-#                 else:
-#                     self.assertNotIn('Location', response.headers)
+    def test_location_header(self):
+        """Assert that the Location header is correctly set in the response."""
+        for i, response in enumerate(self.responses):
+            with self.subTest(self.bodies[i]):
+                if self.bodies[i][0] == 201:
+                    self.assertEqual(
+                        self.url + self.bodies[i][1]['id'] + '/',
+                        response.headers['Location']
+                    )
+                else:
+                    self.assertNotIn('Location', response.headers)
 
-#     def test_exception_keys_json(self):
-#         """Assert the JSON body returned contains the correct keys."""
-#         for i, response in enumerate(self.responses):
-#             if self.bodies[i][0] >= 400:
-#                 response_body = response.json()
-#                 with self.subTest(self.bodies[i]):
-#                     for error_key in ERROR_KEYS:
-#                         with self.subTest(error_key):
-#                             self.assertIn(error_key, response_body)
+    def test_exception_keys_json(self):
+        """Assert the JSON body returned contains the correct keys."""
+        for i, response in enumerate(self.responses):
+            if self.bodies[i][0] >= 400:
+                response_body = response.json()
+                with self.subTest(self.bodies[i]):
+                    for error_key in ERROR_KEYS:
+                        with self.subTest(error_key):
+                            self.assertIn(error_key, response_body)
 
-#     def test_exception_json_http_status(self):
-#         """Assert the JSON body returned contains the correct HTTP code."""
-#         for i, response in enumerate(self.responses):
-#             if self.bodies[i][0] >= 400:
-#                 with self.subTest(self.bodies[i]):
-#                     json_status = response.json()['http_status']
-#                     self.assertEqual(json_status, self.bodies[i][0])
+    def test_exception_json_http_status(self):
+        """Assert the JSON body returned contains the correct HTTP code."""
+        for i, response in enumerate(self.responses):
+            if self.bodies[i][0] >= 400:
+                with self.subTest(self.bodies[i]):
+                    json_status = response.json()['http_status']
+                    self.assertEqual(json_status, self.bodies[i][0])
 
     @classmethod
     def tearDownClass(cls):
@@ -217,7 +232,7 @@ class CreateFailureTestCase(TestCase):
                 ).raise_for_status()
 
 
-class ReadUpdateDeleteSuccessTestCase(TestCase):
+class ReadUpdateDeleteSuccessTestCase(BaseTest):
     """Establish that we can read, update, and delete repositories.
 
     This test assumes that the assertions in :class:`CreateSuccessTestCase` are
@@ -247,22 +262,10 @@ class ReadUpdateDeleteSuccessTestCase(TestCase):
             cls.paths.append(response.json()['_href'])
 
         # Read, update, and delete the three repositories, respectively.
-        cls.read_response = requests.get(
-            cls.cfg.base_url + cls.paths[0],
-            **cls.cfg.get_requests_kwargs()
-        )
-        cls.distributors_response = requests.get(
-            cls.cfg.base_url + cls.paths[0] + "?distributors=true",
-            **cls.cfg.get_requests_kwargs()
-        )
-        cls.importers_response = requests.get(
-            cls.cfg.base_url + cls.paths[0] + "?importers=true",
-            **cls.cfg.get_requests_kwargs()
-        )
-        cls.details_response = requests.get(
-            cls.cfg.base_url + cls.paths[0] + "?details=true",
-            **cls.cfg.get_requests_kwargs()
-        )
+        cls.read_response = cls.get(cls.paths[0])
+        cls.distributors_response = cls.get(cls.paths[0], query="distributors=true")
+        cls.importers_response = cls.get(cls.paths[0], query="importers=true")
+        cls.details_response = cls.get(cls.paths[0], query="details=true")
         cls.update_response = requests.put(
             cls.cfg.base_url + cls.paths[1],
             json=cls.update_body,
@@ -420,7 +423,7 @@ jk    │   ├── It is possible to read distributors of a repo.
 """
 
 
-class ReadSearchUpdateISORepoSuccessCase(TestCase):
+class ReadUpdateDeleteISORepoSuccessCase(BaseTest):
     @classmethod
     def setUpClass(cls):
         """Create three ISO repositories to read, update, and delete."""
@@ -464,23 +467,13 @@ class ReadSearchUpdateISORepoSuccessCase(TestCase):
             response.raise_for_status()
             cls.paths.append(response.json()['_href'])
 
-        # Read, update, and delete the three repositories, respectively.
-        cls.read_response = requests.get(
-            cls.cfg.base_url + cls.paths[0],
-            **cls.cfg.get_requests_kwargs()
-        )
-        cls.distributors_response = requests.get(
-            cls.cfg.base_url + cls.paths[0] + "?distributors=true",
-            **cls.cfg.get_requests_kwargs()
-        )
-        cls.importers_response = requests.get(
-            cls.cfg.base_url + cls.paths[0] + "?importers=true",
-            **cls.cfg.get_requests_kwargs()
-        )
-        cls.details_response = requests.get(
-            cls.cfg.base_url + cls.paths[0] + "?details=true",
-            **cls.cfg.get_requests_kwargs()
-        )
+        # All 3 options for reads
+        cls.read_response = cls.get(cls.paths[0])
+        cls.distributors_response = cls.get(cls.paths[0], query="distributors=true")
+        cls.importers_response = cls.get(cls.paths[0], query="importers=true")
+        cls.details_response = cls.get(cls.paths[0], query="details=true")
+
+        # Update and delete
         cls.update_response = requests.put(
             cls.cfg.base_url + cls.paths[1],
             json=cls.update_body,
@@ -560,7 +553,4 @@ class ReadSearchUpdateISORepoSuccessCase(TestCase):
                 cls.cfg.base_url + path,
                 **cls.cfg.get_requests_kwargs()
             ).raise_for_status()
-
-
-def 
 
