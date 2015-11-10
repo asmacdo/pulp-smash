@@ -46,6 +46,7 @@ from __future__ import unicode_literals
 
 import requests
 
+from pulp_smash.compat import urlencode
 from pulp_smash.config import get_config
 from pulp_smash.constants import REPOSITORY_PATH, ERROR_KEYS
 from pulp_smash.utils import rand_str
@@ -71,6 +72,22 @@ SERIALIZED_ISO_DISTRIBUTOR = {
     'distributor_type_id': 'iso_distributor',
     'last_publish': None,
 }
+
+
+class BaseTest(TestCase):
+
+    @classmethod
+    def get(cls, path, query=None):
+        """Build a url and make a get request."""
+        if isinstance(query, dict):
+            query = urlencode(query)
+        if query is not None:
+            query = '?{query}'.format(query=query)
+        else:
+            query = ''
+
+        full_url = "{base}{path}{query}".format(base=cls.cfg.base_url, path=path, query=query)
+        return requests.get(full_url, **cls.cfg.get_requests_kwargs())
 
 
 class CreateSuccessTestCase(TestCase):
@@ -420,7 +437,7 @@ jk    │   ├── It is possible to read distributors of a repo.
 """
 
 
-class ReadSearchUpdateISORepoSuccessCase(TestCase):
+class ReadSearchUpdateISORepoSuccessCase(BaseTest):
     @classmethod
     def setUpClass(cls):
         """Create three ISO repositories to read, update, and delete."""
@@ -465,10 +482,7 @@ class ReadSearchUpdateISORepoSuccessCase(TestCase):
             cls.paths.append(response.json()['_href'])
 
         # Read, update, and delete the three repositories, respectively.
-        cls.read_response = requests.get(
-            cls.cfg.base_url + cls.paths[0],
-            **cls.cfg.get_requests_kwargs()
-        )
+        cls.read_response = cls.get(cls.paths[0])
         cls.distributors_response = requests.get(
             cls.cfg.base_url + cls.paths[0] + "?distributors=true",
             **cls.cfg.get_requests_kwargs()
@@ -560,7 +574,4 @@ class ReadSearchUpdateISORepoSuccessCase(TestCase):
                 cls.cfg.base_url + path,
                 **cls.cfg.get_requests_kwargs()
             ).raise_for_status()
-
-
-def 
 
