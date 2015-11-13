@@ -32,14 +32,9 @@ from __future__ import unicode_literals
 import requests
 from pulp_smash.config import get_config
 from pulp_smash.constants import USER_PATH
+from pulp_smash.compat import urlencode
 from random import randint
 from unittest2 import TestCase, skip
-
-from sys import version_info
-if version_info.major == 2:
-    from urllib import urlencode  # pylint:disable=no-name-in-module
-else:
-    from urllib.parse import urlencode  # noqa pylint:disable=no-name-in-module,import-error
 
 
 _SEARCH_PATH = USER_PATH + 'search/'
